@@ -1,9 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-
-function App() {
-  return <h1>Paperspine</h1>;
-}
+import { App } from "./App.js";
+import "./styles.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
