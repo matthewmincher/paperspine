@@ -6,8 +6,10 @@
   <title>Paperspine — Ingest</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 2rem; color: #1a1a1a; }
+    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 0 auto; padding: 2rem; color: #1a1a1a; }
     h1 { margin-bottom: 1.5rem; }
+    h2 { margin-bottom: 1rem; }
+
     .drop-zone {
       border: 2px dashed #ccc; border-radius: 8px; padding: 3rem; text-align: center;
       cursor: pointer; transition: border-color 0.2s, background 0.2s;
@@ -17,19 +19,36 @@
     .status { margin-top: 1rem; padding: 0.75rem; border-radius: 4px; display: none; }
     .status.loading { display: block; background: #fff3cd; }
     .status.error { display: block; background: #f8d7da; color: #721c24; }
-    .results { margin-top: 2rem; }
+    .status.success { display: block; background: #d4edda; color: #155724; }
+
+    .review-section { margin-top: 2rem; display: none; }
+    .review-section.visible { display: block; }
+
+    .shelf-name-input { width: 100%; padding: 0.5rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 1rem; }
+
     .book-card {
       border: 1px solid #e0e0e0; border-radius: 6px; padding: 1rem; margin-bottom: 0.75rem;
       display: flex; gap: 1rem; align-items: flex-start;
     }
-    .book-card img { width: 48px; height: 72px; object-fit: cover; border-radius: 3px; background: #f0f0f0; }
+    .book-card img { width: 48px; height: 72px; object-fit: cover; border-radius: 3px; background: #f0f0f0; flex-shrink: 0; }
     .book-card .info { flex: 1; }
-    .book-card .title { font-weight: 600; }
-    .book-card .author { color: #555; font-size: 0.9rem; }
-    .book-card .meta { font-size: 0.8rem; color: #777; margin-top: 0.25rem; }
-    .tags { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.4rem; }
-    .tag { font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 8px; background: #e8f4fd; color: #1a6fb5; }
-    .confidence { font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 12px; background: #e8e8e8; white-space: nowrap; }
+    .book-card input { width: 100%; padding: 0.3rem 0.5rem; border: 1px solid #ddd; border-radius: 3px; margin-bottom: 0.3rem; font-size: 0.9rem; }
+    .book-card .tags-input { font-size: 0.8rem; color: #555; }
+    .book-card .actions { display: flex; flex-direction: column; gap: 0.25rem; }
+    .btn-delete { background: #dc3545; color: white; border: none; border-radius: 3px; padding: 0.3rem 0.6rem; cursor: pointer; font-size: 0.8rem; }
+    .btn-delete:hover { background: #c82333; }
+
+    .add-book { margin-top: 1rem; padding: 1rem; border: 1px dashed #ccc; border-radius: 6px; display: flex; gap: 0.5rem; align-items: center; }
+    .add-book input { flex: 1; padding: 0.4rem; border: 1px solid #ddd; border-radius: 3px; }
+    .btn-add { background: #28a745; color: white; border: none; border-radius: 3px; padding: 0.4rem 0.8rem; cursor: pointer; }
+    .btn-add:hover { background: #218838; }
+
+    .confirm-section { margin-top: 1.5rem; display: flex; gap: 1rem; align-items: center; }
+    .btn-confirm { background: #007bff; color: white; border: none; border-radius: 4px; padding: 0.6rem 1.5rem; font-size: 1rem; cursor: pointer; }
+    .btn-confirm:hover { background: #0056b3; }
+    .btn-confirm:disabled { background: #6c757d; cursor: not-allowed; }
+
+    .confidence { font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 10px; background: #e8e8e8; }
     .confidence.high { background: #d4edda; color: #155724; }
     .confidence.medium { background: #fff3cd; color: #856404; }
     .confidence.low { background: #f8d7da; color: #721c24; }
@@ -37,18 +56,44 @@
 </head>
 <body>
   <h1>Paperspine Ingest</h1>
-  <div class="drop-zone" id="dropZone">
-    <p>Drag & drop a bookshelf photo here, or click to select</p>
-    <input type="file" id="fileInput" accept="image/*">
+
+  <div id="uploadSection">
+    <div class="drop-zone" id="dropZone">
+      <p>Drag & drop a bookshelf photo here, or click to select</p>
+      <input type="file" id="fileInput" accept="image/*">
+    </div>
   </div>
+
   <div class="status" id="status"></div>
-  <div class="results" id="results"></div>
+
+  <div class="review-section" id="reviewSection">
+    <h2>Review Extracted Books</h2>
+    <input class="shelf-name-input" id="shelfName" type="text" placeholder="Shelf name (e.g. Living Room, Office)">
+    <div id="bookList"></div>
+
+    <div class="add-book">
+      <input type="text" id="addTitle" placeholder="Title">
+      <input type="text" id="addAuthor" placeholder="Author">
+      <button class="btn-add" id="addBtn">Add Book</button>
+    </div>
+
+    <div class="confirm-section">
+      <button class="btn-confirm" id="confirmBtn">Upload to AWS</button>
+    </div>
+  </div>
 
   <script>
+    let books = [];
+    let shelfPhoto = null;
+    let shelfPhotoMimeType = null;
+
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
     const status = document.getElementById('status');
-    const results = document.getElementById('results');
+    const reviewSection = document.getElementById('reviewSection');
+    const bookList = document.getElementById('bookList');
+    const confirmBtn = document.getElementById('confirmBtn');
+    const addBtn = document.getElementById('addBtn');
 
     dropZone.addEventListener('click', () => fileInput.click());
     dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
@@ -61,13 +106,9 @@
     fileInput.addEventListener('change', () => { if (fileInput.files.length) handleFile(fileInput.files[0]); });
 
     async function handleFile(file) {
-      if (!file.type.startsWith('image/')) {
-        showError('Please select an image file.');
-        return;
-      }
-
+      if (!file.type.startsWith('image/')) { showError('Please select an image file.'); return; }
       showLoading('Analyzing bookshelf photo — extracting and enriching books...');
-      results.innerHTML = '';
+      reviewSection.classList.remove('visible');
 
       const formData = new FormData();
       formData.append('photo', file);
@@ -77,32 +118,106 @@
         if (!res.ok) throw new Error((await res.json()).error || 'Upload failed');
         const data = await res.json();
 
-        if (!data.books.length) {
-          showError('No books detected in this image.');
-          return;
-        }
+        if (!data.books.length) { showError('No books detected in this image.'); return; }
 
+        books = data.books;
+        shelfPhoto = data.shelfPhoto;
+        shelfPhotoMimeType = data.shelfPhotoMimeType;
         hideStatus();
-        results.innerHTML = `<h2>${data.books.length} book${data.books.length > 1 ? 's' : ''} found</h2>` +
-          data.books.map(b => `
-            <div class="book-card">
-              ${b.coverUrl ? `<img src="${esc(b.coverUrl)}" alt="">` : '<img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22/%3E" alt="">'}
-              <div class="info">
-                <div class="title">${esc(b.title)}</div>
-                <div class="author">${esc(b.author)}</div>
-                ${b.isbn ? `<div class="meta">ISBN: ${esc(b.isbn)}</div>` : ''}
-                ${b.tags?.length ? `<div class="tags">${b.tags.map(t => `<span class="tag">${esc(t.name)}</span>`).join('')}</div>` : ''}
-              </div>
-              <span class="confidence ${b.confidence}">${b.confidence}</span>
-            </div>
-          `).join('');
+        renderBooks();
+        reviewSection.classList.add('visible');
       } catch (err) {
         showError(err.message);
       }
     }
 
+    function renderBooks() {
+      bookList.innerHTML = books.map((b, i) => `
+        <div class="book-card" data-index="${i}">
+          ${b.coverUrl ? `<img src="${esc(b.coverUrl)}" alt="">` : '<img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22/%3E" alt="">'}
+          <div class="info">
+            <input type="text" value="${esc(b.title)}" data-field="title" data-index="${i}">
+            <input type="text" value="${esc(b.author)}" data-field="author" data-index="${i}">
+            <input class="tags-input" type="text" value="${(b.tags || []).map(t => t.name).join(', ')}" data-field="tags" data-index="${i}" placeholder="Tags (comma-separated)">
+          </div>
+          <div class="actions">
+            <span class="confidence ${b.confidence}">${b.confidence}</span>
+            <button class="btn-delete" onclick="deleteBook(${i})">Remove</button>
+          </div>
+        </div>
+      `).join('');
+
+      bookList.querySelectorAll('input').forEach(input => {
+        input.addEventListener('change', (e) => {
+          const idx = parseInt(e.target.dataset.index);
+          const field = e.target.dataset.field;
+          if (field === 'tags') {
+            books[idx].tags = e.target.value.split(',').map(t => t.trim()).filter(Boolean).map(name => ({ name, category: 'other' }));
+          } else {
+            books[idx][field] = e.target.value;
+          }
+        });
+      });
+    }
+
+    function deleteBook(index) {
+      books.splice(index, 1);
+      renderBooks();
+    }
+
+    addBtn.addEventListener('click', async () => {
+      const title = document.getElementById('addTitle').value.trim();
+      const author = document.getElementById('addAuthor').value.trim();
+      if (!title || !author) return;
+
+      showLoading('Enriching new book...');
+      try {
+        const res = await fetch('/api/enrich', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, author }),
+        });
+        if (!res.ok) throw new Error('Enrichment failed');
+        const data = await res.json();
+        books.push(data.book);
+        document.getElementById('addTitle').value = '';
+        document.getElementById('addAuthor').value = '';
+        hideStatus();
+        renderBooks();
+      } catch (err) {
+        showError(err.message);
+      }
+    });
+
+    confirmBtn.addEventListener('click', async () => {
+      const shelfName = document.getElementById('shelfName').value.trim();
+      if (!shelfName) { showError('Please enter a shelf name.'); return; }
+      if (!books.length) { showError('No books to upload.'); return; }
+
+      confirmBtn.disabled = true;
+      showLoading('Uploading to AWS...');
+
+      try {
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ shelfName, shelfPhoto, shelfPhotoMimeType, books }),
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Upload failed');
+        const data = await res.json();
+        showSuccess(`Uploaded ${data.bookIds.length} book(s) to shelf "${shelfName}".`);
+        reviewSection.classList.remove('visible');
+        books = [];
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        confirmBtn.disabled = false;
+      }
+    });
+
     function showLoading(msg) { status.className = 'status loading'; status.textContent = msg; }
     function showError(msg) { status.className = 'status error'; status.textContent = msg; }
+    function showSuccess(msg) { status.className = 'status success'; status.textContent = msg; }
     function hideStatus() { status.className = 'status'; }
     function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
   </script>
