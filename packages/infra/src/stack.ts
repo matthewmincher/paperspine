@@ -77,37 +77,35 @@ export class PaperspineStack extends Stack {
       ],
     });
 
-    const lambdaEnv = {
-      TABLE_NAME: this.booksTable.tableName,
-      SHELVES_TABLE_NAME: this.shelvesTable.tableName,
-    };
+    const booksEnv = { TABLE_NAME: this.booksTable.tableName };
+    const shelvesEnv = { SHELVES_TABLE_NAME: this.shelvesTable.tableName };
 
     const getBooksHandler = new NodejsFunction(this, "GetBooksHandler", {
       runtime: lambda.Runtime.NODEJS_20_X,
       entry: path.join(__dirname, "lambdas/get-books.ts"),
       handler: "handler",
-      environment: lambdaEnv,
+      environment: booksEnv,
     });
 
     const getBookHandler = new NodejsFunction(this, "GetBookHandler", {
       runtime: lambda.Runtime.NODEJS_20_X,
       entry: path.join(__dirname, "lambdas/get-book.ts"),
       handler: "handler",
-      environment: lambdaEnv,
+      environment: booksEnv,
     });
 
     const getTagsHandler = new NodejsFunction(this, "GetTagsHandler", {
       runtime: lambda.Runtime.NODEJS_20_X,
       entry: path.join(__dirname, "lambdas/get-tags.ts"),
       handler: "handler",
-      environment: lambdaEnv,
+      environment: booksEnv,
     });
 
     const getShelvesHandler = new NodejsFunction(this, "GetShelvesHandler", {
       runtime: lambda.Runtime.NODEJS_20_X,
       entry: path.join(__dirname, "lambdas/get-shelves.ts"),
       handler: "handler",
-      environment: lambdaEnv,
+      environment: shelvesEnv,
     });
 
     this.booksTable.grantReadData(getBooksHandler);

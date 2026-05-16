@@ -1,8 +1,8 @@
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, ScanCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import type { APIGatewayProxyHandler } from "aws-lambda";
+import type { Tag } from "@paperspine/shared";
+import { scanAll, queryAll } from "./db.js";
+import { ok, error } from "./response.js";
 
-const client = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const TABLE_NAME = process.env.TABLE_NAME!;
 
 export const handler: APIGatewayProxyHandler = async (event) => {
@@ -10,63 +10,38 @@ export const handler: APIGatewayProxyHandler = async (event) => {
   const { tag, shelf, author, q } = params;
 
   try {
-    let items;
-
-    if (shelf) {
-      const result = await client.send(
-        new QueryCommand({
+    let items = shelf
+      ? await queryAll({
           TableName: TABLE_NAME,
           IndexName: "shelfId-index",
           KeyConditionExpression: "shelfId = :shelfId",
           ExpressionAttributeValues: { ":shelfId": shelf },
-        }),
-      );
-      items = result.Items ?? [];
-    } else {
-      const result = await client.send(
-        new ScanCommand({ TableName: TABLE_NAME }),
-      );
-      items = result.Items ?? [];
-    }
+        })
+      : await scanAll({ TableName: TABLE_NAME });
 
     if (tag) {
       items = items.filter((item) =>
-        item.tags?.some((t: { name: string }) => t.name === tag),
+        (item.tags as Tag[] | undefined)?.some((t) => t.name === tag),
       );
     }
     if (author) {
-      items = items.filter(
-        (item) => item.author?.toLowerCase().includes(author.toLowerCase()),
+      const lc = author.toLowerCase();
+      items = items.filter((item) =>
+        (item.author as string)?.toLowerCase().includes(lc),
       );
     }
     if (q) {
-      const query = q.toLowerCase();
+      const lc = q.toLowerCase();
       items = items.filter(
         (item) =>
-          item.title?.toLowerCase().includes(query) ||
-          item.author?.toLowerCase().includes(query),
+          (item.title as string)?.toLowerCase().includes(lc) ||
+          (item.author as string)?.toLowerCase().includes(lc),
       );
     }
 
-    return {
-      statusCode: 200,
-      headers: corsHeaders(),
-      body: JSON.stringify({ books: items }),
-    };
+    return ok({ books: items });
   } catch (err) {
     console.error(err);
-    return {
-      statusCode: 500,
-      headers: corsHeaders(),
-      body: JSON.stringify({ error: "Internal server error" }),
-    };
+    return error(500, "Internal server error");
   }
 };
-
-function corsHeaders() {
-  return {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Content-Type": "application/json",
-  };
-}
