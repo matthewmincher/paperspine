@@ -12,11 +12,19 @@ import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
+import * as acm from "aws-cdk-lib/aws-certificatemanager";
+import * as route53 from "aws-cdk-lib/aws-route53";
+import * as route53Targets from "aws-cdk-lib/aws-route53-targets";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+function deriveZoneName(domain: string): string {
+  const parts = domain.split(".");
+  return parts.length <= 2 ? domain : parts.slice(1).join(".");
+}
 
 export class PaperspineStack extends Stack {
   public readonly booksTable: dynamodb.Table;
@@ -28,6 +36,9 @@ export class PaperspineStack extends Stack {
 
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
+
+    const apiDomain = this.node.tryGetContext("apiDomain") as string | undefined;
+    const frontendDomain = this.node.tryGetContext("frontendDomain") as string | undefined;
 
     this.booksTable = new dynamodb.Table(this, "BooksTable", {
       partitionKey: { name: "bookId", type: dynamodb.AttributeType.STRING },
@@ -57,6 +68,22 @@ export class PaperspineStack extends Stack {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
     });
 
+    // --- CloudFront distribution ---
+
+    let frontendCert: acm.ICertificate | undefined;
+    if (frontendDomain) {
+      const zoneName = deriveZoneName(frontendDomain);
+      const zone = route53.HostedZone.fromLookup(this, "FrontendZone", {
+        domainName: zoneName,
+      });
+
+      frontendCert = new acm.DnsValidatedCertificate(this, "FrontendCert", {
+        domainName: frontendDomain,
+        hostedZone: zone,
+        region: "us-east-1",
+      });
+    }
+
     this.distribution = new cloudfront.Distribution(this, "Distribution", {
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(this.frontendBucket),
@@ -75,10 +102,31 @@ export class PaperspineStack extends Stack {
           responsePagePath: "/index.html",
         },
       ],
+      ...(frontendDomain && frontendCert
+        ? { domainNames: [frontendDomain], certificate: frontendCert }
+        : {}),
     });
 
-    const booksEnv = { TABLE_NAME: this.booksTable.tableName };
-    const shelvesEnv = { SHELVES_TABLE_NAME: this.shelvesTable.tableName };
+    if (frontendDomain) {
+      const zoneName = deriveZoneName(frontendDomain);
+      const zone = route53.HostedZone.fromLookup(this, "FrontendAliasZone", {
+        domainName: zoneName,
+      });
+
+      new route53.ARecord(this, "FrontendAliasRecord", {
+        zone,
+        recordName: frontendDomain,
+        target: route53.RecordTarget.fromAlias(
+          new route53Targets.CloudFrontTarget(this.distribution),
+        ),
+      });
+    }
+
+    // --- Lambda handlers ---
+
+    const corsOrigin = frontendDomain ? `https://${frontendDomain}` : "*";
+    const booksEnv = { TABLE_NAME: this.booksTable.tableName, CORS_ORIGIN: corsOrigin };
+    const shelvesEnv = { SHELVES_TABLE_NAME: this.shelvesTable.tableName, CORS_ORIGIN: corsOrigin };
 
     const getBooksHandler = new NodejsFunction(this, "GetBooksHandler", {
       runtime: lambda.Runtime.NODEJS_20_X,
@@ -113,10 +161,16 @@ export class PaperspineStack extends Stack {
     this.booksTable.grantReadData(getTagsHandler);
     this.shelvesTable.grantReadData(getShelvesHandler);
 
+    // --- API Gateway ---
+
+    const corsOrigins = frontendDomain
+      ? [`https://${frontendDomain}`]
+      : apigateway.Cors.ALL_ORIGINS;
+
     this.api = new apigateway.RestApi(this, "Api", {
       restApiName: "Paperspine API",
       defaultCorsPreflightOptions: {
-        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        allowOrigins: corsOrigins,
         allowMethods: apigateway.Cors.ALL_METHODS,
         allowHeaders: ["Content-Type"],
       },
@@ -134,6 +188,33 @@ export class PaperspineStack extends Stack {
     const shelves = this.api.root.addResource("shelves");
     shelves.addMethod("GET", new apigateway.LambdaIntegration(getShelvesHandler));
 
+    if (apiDomain) {
+      const zoneName = deriveZoneName(apiDomain);
+      const zone = route53.HostedZone.fromLookup(this, "ApiZone", {
+        domainName: zoneName,
+      });
+
+      const apiCert = new acm.Certificate(this, "ApiCert", {
+        domainName: apiDomain,
+        validation: acm.CertificateValidation.fromDns(zone),
+      });
+
+      const customDomain = this.api.addDomainName("ApiCustomDomain", {
+        domainName: apiDomain,
+        certificate: apiCert,
+      });
+
+      new route53.ARecord(this, "ApiAliasRecord", {
+        zone,
+        recordName: apiDomain,
+        target: route53.RecordTarget.fromAlias(
+          new route53Targets.ApiGatewayDomain(customDomain),
+        ),
+      });
+    }
+
+    // --- Frontend deployment ---
+
     new s3deploy.BucketDeployment(this, "DeployFrontend", {
       sources: [s3deploy.Source.asset(path.join(__dirname, "../../frontend/dist"))],
       destinationBucket: this.frontendBucket,
@@ -141,13 +222,29 @@ export class PaperspineStack extends Stack {
       distributionPaths: ["/*"],
     });
 
+    // --- Outputs ---
+
     new CfnOutput(this, "ApiUrl", {
-      value: this.api.url,
+      value: apiDomain ? `https://${apiDomain}` : this.api.url,
     });
 
     new CfnOutput(this, "DistributionUrl", {
-      value: `https://${this.distribution.distributionDomainName}`,
+      value: frontendDomain
+        ? `https://${frontendDomain}`
+        : `https://${this.distribution.distributionDomainName}`,
     });
+
+    if (!apiDomain) {
+      new CfnOutput(this, "ApiDnsSetup", {
+        value: `To use a custom API domain, create a CNAME in your DNS provider pointing to: ${this.api.url}`,
+      });
+    }
+
+    if (!frontendDomain) {
+      new CfnOutput(this, "FrontendDnsSetup", {
+        value: `To use a custom frontend domain, create a CNAME in your DNS provider pointing to: ${this.distribution.distributionDomainName}`,
+      });
+    }
 
     new CfnOutput(this, "ImagesBucketName", {
       value: this.imagesBucket.bucketName,

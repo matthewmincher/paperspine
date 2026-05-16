@@ -55,4 +55,13 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - run: cd packages/infra && npx cdk deploy --require-approval never
+      - name: Deploy CDK stack
+        run: |
+          CONTEXT_ARGS=""
+          if [ -n "${{ vars.API_DOMAIN }}" ]; then
+            CONTEXT_ARGS="$CONTEXT_ARGS -c apiDomain=${{ vars.API_DOMAIN }}"
+          fi
+          if [ -n "${{ vars.FRONTEND_DOMAIN }}" ]; then
+            CONTEXT_ARGS="$CONTEXT_ARGS -c frontendDomain=${{ vars.FRONTEND_DOMAIN }}"
+          fi
+          cd packages/infra && npx cdk deploy --require-approval never $CONTEXT_ARGS

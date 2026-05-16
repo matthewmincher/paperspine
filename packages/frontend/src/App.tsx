@@ -39,20 +39,14 @@ export function App() {
     [books],
   );
 
+  let content;
   if (booksApi.loading && !booksApi.data) {
-    return <div className="loading">Loading books...</div>;
-  }
-
-  if (booksApi.error && !booksApi.data) {
-    return <div className="error">Failed to load books: {booksApi.error}</div>;
-  }
-
-  return (
-    <div className="app">
-      <header>
-        <h1>Paperspine</h1>
-      </header>
-      <main>
+    content = <div className="loading">Loading books...</div>;
+  } else if (booksApi.error && !booksApi.data) {
+    content = <div className="error">Failed to load books: {booksApi.error}</div>;
+  } else {
+    content = (
+      <>
         <SearchBar value={search} onChange={setSearch} />
         <Filters
           tags={tags}
@@ -66,7 +60,17 @@ export function App() {
           onAuthorChange={setSelectedAuthor}
         />
         <BookGrid books={books} onSelect={setSelectedBook} />
-      </main>
+      </>
+    );
+  }
+
+  return (
+    <div className="app">
+      <header>
+        <img src="/logo.png" alt="Paperspine" className="header-logo" />
+        <h1>Paperspine</h1>
+      </header>
+      <main>{content}</main>
       {selectedBook && (
         <BookDetail
           book={selectedBook}

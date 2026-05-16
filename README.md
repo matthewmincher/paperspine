@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.png" alt="Paperspine" width="200" />
+</p>
+
 # Paperspine
 
 A bookshelf cataloguing app. Photograph your bookshelves, extract and enrich book metadata using AI, then browse your collection through a web frontend.
