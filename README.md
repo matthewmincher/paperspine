@@ -36,11 +36,17 @@ npm install
 
 ### Frontend (browse your catalogue)
 
+Create a `.env.local` file in `packages/frontend/` with your deployed API URL:
+
+```sh
+echo "VITE_API_URL=https://your-api-domain.example.com" > packages/frontend/.env.local
+```
+
+Then start the dev server — Vite will proxy API requests to your deployed backend:
+
 ```sh
 npm run dev -w @paperspine/frontend
 ```
-
-Set `VITE_API_URL` to your deployed API Gateway URL (from `cdk deploy` output) before running, or leave empty for relative paths if proxying.
 
 ### Ingest tool (add books)
 
