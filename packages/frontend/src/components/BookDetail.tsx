@@ -1,11 +1,15 @@
-import type { Book } from "@paperspine/shared";
+import type { Book, Shelf } from "@paperspine/shared";
+import { BookCover } from "./BookCover.js";
 
 interface Props {
   book: Book;
+  shelves: Shelf[];
   onClose: () => void;
 }
 
-export function BookDetail({ book, onClose }: Props) {
+export function BookDetail({ book, shelves, onClose }: Props) {
+  const shelfName = shelves.find((s) => s.shelfId === book.shelfId)?.name ?? book.shelfId;
+
   return (
     <div className="book-detail-overlay" onClick={onClose}>
       <div className="book-detail" onClick={(e) => e.stopPropagation()}>
@@ -13,13 +17,7 @@ export function BookDetail({ book, onClose }: Props) {
           &times;
         </button>
         <div className="book-detail-content">
-          {book.coverUrl ? (
-            <img src={book.coverUrl} alt={book.title} className="detail-cover" />
-          ) : (
-            <div className="detail-cover book-cover-placeholder">
-              <span>{book.title[0]}</span>
-            </div>
-          )}
+          <BookCover book={book} className="detail-cover" />
           <div className="detail-info">
             <h2>{book.title}</h2>
             <p className="detail-author">{book.author}</p>
@@ -34,7 +32,7 @@ export function BookDetail({ book, onClose }: Props) {
                 ))}
               </div>
             )}
-            <p className="detail-meta">Shelf: {book.shelfId}</p>
+            <p className="detail-meta">Shelf: {shelfName}</p>
           </div>
         </div>
       </div>
