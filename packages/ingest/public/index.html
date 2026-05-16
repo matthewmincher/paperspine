@@ -20,11 +20,16 @@
     .results { margin-top: 2rem; }
     .book-card {
       border: 1px solid #e0e0e0; border-radius: 6px; padding: 1rem; margin-bottom: 0.75rem;
-      display: flex; justify-content: space-between; align-items: center;
+      display: flex; gap: 1rem; align-items: flex-start;
     }
+    .book-card img { width: 48px; height: 72px; object-fit: cover; border-radius: 3px; background: #f0f0f0; }
+    .book-card .info { flex: 1; }
     .book-card .title { font-weight: 600; }
     .book-card .author { color: #555; font-size: 0.9rem; }
-    .confidence { font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 12px; background: #e8e8e8; }
+    .book-card .meta { font-size: 0.8rem; color: #777; margin-top: 0.25rem; }
+    .tags { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.4rem; }
+    .tag { font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 8px; background: #e8f4fd; color: #1a6fb5; }
+    .confidence { font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 12px; background: #e8e8e8; white-space: nowrap; }
     .confidence.high { background: #d4edda; color: #155724; }
     .confidence.medium { background: #fff3cd; color: #856404; }
     .confidence.low { background: #f8d7da; color: #721c24; }
@@ -61,7 +66,7 @@
         return;
       }
 
-      showLoading('Analyzing bookshelf photo...');
+      showLoading('Analyzing bookshelf photo — extracting and enriching books...');
       results.innerHTML = '';
 
       const formData = new FormData();
@@ -81,7 +86,13 @@
         results.innerHTML = `<h2>${data.books.length} book${data.books.length > 1 ? 's' : ''} found</h2>` +
           data.books.map(b => `
             <div class="book-card">
-              <div><div class="title">${esc(b.title)}</div><div class="author">${esc(b.author)}</div></div>
+              ${b.coverUrl ? `<img src="${esc(b.coverUrl)}" alt="">` : '<img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22/%3E" alt="">'}
+              <div class="info">
+                <div class="title">${esc(b.title)}</div>
+                <div class="author">${esc(b.author)}</div>
+                ${b.isbn ? `<div class="meta">ISBN: ${esc(b.isbn)}</div>` : ''}
+                ${b.tags?.length ? `<div class="tags">${b.tags.map(t => `<span class="tag">${esc(t.name)}</span>`).join('')}</div>` : ''}
+              </div>
               <span class="confidence ${b.confidence}">${b.confidence}</span>
             </div>
           `).join('');
