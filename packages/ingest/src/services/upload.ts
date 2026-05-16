@@ -1,5 +1,5 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
 import type { EnrichedBook } from "./enrichment.js";
@@ -20,35 +20,52 @@ export interface UploadPayload {
   books: EnrichedBook[];
 }
 
-export async function uploadToAws(payload: UploadPayload) {
-  const shelfId = randomUUID();
-  const createdAt = new Date().toISOString();
-
-  let shelfImageUrl: string | undefined;
-  if (payload.shelfPhoto) {
-    const key = `images/shelves/${shelfId}/photo.jpg`;
-    await s3.send(
-      new PutObjectCommand({
-        Bucket: IMAGES_BUCKET,
-        Key: key,
-        Body: payload.shelfPhoto,
-        ContentType: payload.shelfPhotoMimeType ?? "image/jpeg",
-      }),
-    );
-    shelfImageUrl = `/${key}`;
-  }
-
-  await ddb.send(
-    new PutCommand({
+async function findShelfByName(name: string): Promise<string | undefined> {
+  const result = await ddb.send(
+    new ScanCommand({
       TableName: SHELVES_TABLE,
-      Item: {
-        shelfId,
-        name: payload.shelfName,
-        imageUrl: shelfImageUrl,
-        createdAt,
-      },
+      FilterExpression: "#n = :name",
+      ExpressionAttributeNames: { "#n": "name" },
+      ExpressionAttributeValues: { ":name": name },
     }),
   );
+  return result.Items?.[0]?.shelfId as string | undefined;
+}
+
+export async function uploadToAws(payload: UploadPayload) {
+  const createdAt = new Date().toISOString();
+
+  let shelfId = await findShelfByName(payload.shelfName);
+
+  if (!shelfId) {
+    shelfId = randomUUID();
+
+    let shelfImageUrl: string | undefined;
+    if (payload.shelfPhoto) {
+      const key = `images/shelves/${shelfId}/photo.jpg`;
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: IMAGES_BUCKET,
+          Key: key,
+          Body: payload.shelfPhoto,
+          ContentType: payload.shelfPhotoMimeType ?? "image/jpeg",
+        }),
+      );
+      shelfImageUrl = `/${key}`;
+    }
+
+    await ddb.send(
+      new PutCommand({
+        TableName: SHELVES_TABLE,
+        Item: {
+          shelfId,
+          name: payload.shelfName,
+          imageUrl: shelfImageUrl,
+          createdAt,
+        },
+      }),
+    );
+  }
 
   const bookResults = await Promise.all(
     payload.books.map(async (book) => {
