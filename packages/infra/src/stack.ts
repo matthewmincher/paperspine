@@ -11,6 +11,7 @@ import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
+import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import * as path from "path";
 import { fileURLToPath } from "url";
@@ -134,6 +135,13 @@ export class PaperspineStack extends Stack {
 
     const shelves = this.api.root.addResource("shelves");
     shelves.addMethod("GET", new apigateway.LambdaIntegration(getShelvesHandler));
+
+    new s3deploy.BucketDeployment(this, "DeployFrontend", {
+      sources: [s3deploy.Source.asset(path.join(__dirname, "../../frontend/dist"))],
+      destinationBucket: this.frontendBucket,
+      distribution: this.distribution,
+      distributionPaths: ["/*"],
+    });
 
     new CfnOutput(this, "ApiUrl", {
       value: this.api.url,

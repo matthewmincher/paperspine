@@ -10,7 +10,5 @@
     "composite": false
   },
   "include": ["src"],
-  "references": [
-    { "path": "../shared" }
-  ]
+  "references": []
 }
