@@ -30,6 +30,8 @@ jobs:
       - run: npm run typecheck -w @paperspine/ingest
       - run: npm run typecheck -w @paperspine/infra
 
+      - run: npm run build -w @paperspine/frontend
+
       - run: npm test -w @paperspine/infra
       - run: npm test -w @paperspine/ingest
 
