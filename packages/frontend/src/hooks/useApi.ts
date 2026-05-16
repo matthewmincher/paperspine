@@ -22,6 +22,7 @@ export function useApi<T>(fetcher: () => Promise<T>, deps: unknown[] = []) {
       });
 
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
   return { data, loading, error };

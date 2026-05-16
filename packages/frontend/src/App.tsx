@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import type { Book } from "@paperspine/shared";
+import type { Book, Shelf } from "@paperspine/shared";
 import { getBooks, getTags, getShelves } from "./api.js";
 import { useApi } from "./hooks/useApi.js";
 import { BookGrid } from "./components/BookGrid.js";
@@ -14,7 +14,19 @@ export function App() {
   const [selectedAuthor, setSelectedAuthor] = useState("");
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
 
-  const booksApi = useApi(() => getBooks(), []);
+  const filterParams = useMemo(() => {
+    const params: Record<string, string> = {};
+    if (search) params.q = search;
+    if (selectedTag) params.tag = selectedTag;
+    if (selectedShelf) params.shelf = selectedShelf;
+    if (selectedAuthor) params.author = selectedAuthor;
+    return params;
+  }, [search, selectedTag, selectedShelf, selectedAuthor]);
+
+  const booksApi = useApi(
+    () => getBooks(Object.keys(filterParams).length ? filterParams : undefined),
+    [search, selectedTag, selectedShelf, selectedAuthor],
+  );
   const tagsApi = useApi(() => getTags(), []);
   const shelvesApi = useApi(() => getShelves(), []);
 
@@ -27,33 +39,11 @@ export function App() {
     [books],
   );
 
-  const filtered = useMemo(() => {
-    let result = books;
-    if (search) {
-      const q = search.toLowerCase();
-      result = result.filter(
-        (b) =>
-          b.title.toLowerCase().includes(q) ||
-          b.author.toLowerCase().includes(q),
-      );
-    }
-    if (selectedTag) {
-      result = result.filter((b) => b.tags.some((t) => t.name === selectedTag));
-    }
-    if (selectedShelf) {
-      result = result.filter((b) => b.shelfId === selectedShelf);
-    }
-    if (selectedAuthor) {
-      result = result.filter((b) => b.author === selectedAuthor);
-    }
-    return result;
-  }, [books, search, selectedTag, selectedShelf, selectedAuthor]);
-
-  if (booksApi.loading) {
+  if (booksApi.loading && !booksApi.data) {
     return <div className="loading">Loading books...</div>;
   }
 
-  if (booksApi.error) {
+  if (booksApi.error && !booksApi.data) {
     return <div className="error">Failed to load books: {booksApi.error}</div>;
   }
 
@@ -75,10 +65,14 @@ export function App() {
           onShelfChange={setSelectedShelf}
           onAuthorChange={setSelectedAuthor}
         />
-        <BookGrid books={filtered} onSelect={setSelectedBook} />
+        <BookGrid books={books} onSelect={setSelectedBook} />
       </main>
       {selectedBook && (
-        <BookDetail book={selectedBook} onClose={() => setSelectedBook(null)} />
+        <BookDetail
+          book={selectedBook}
+          shelves={shelves}
+          onClose={() => setSelectedBook(null)}
+        />
       )}
     </div>
   );
