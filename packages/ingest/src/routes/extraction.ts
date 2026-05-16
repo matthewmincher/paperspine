@@ -1,6 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { extractBooksFromImage } from "../services/vision.js";
+import { enrichBooks } from "../services/enrichment.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -23,10 +24,11 @@ extractionRouter.post("/extract", upload.single("photo"), async (req, res) => {
   }
 
   try {
-    const books = await extractBooksFromImage(
+    const extracted = await extractBooksFromImage(
       req.file.buffer,
       req.file.mimetype,
     );
+    const books = await enrichBooks(extracted);
     res.json({ books });
   } catch (err) {
     console.error("Extraction failed:", err);
