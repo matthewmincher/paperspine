@@ -1,11 +1,17 @@
 import express from "express";
+import path from "path";
+import { fileURLToPath } from "url";
+import { extractionRouter } from "./routes/extraction.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
-const port = 3001;
+const port = process.env.PORT ?? 3001;
 
-app.get("/", (_req, res) => {
-  res.json({ status: "ok" });
-});
+app.use(express.json());
+app.use(express.static(path.join(__dirname, "../public")));
+
+app.use("/api", extractionRouter);
 
 app.listen(port, () => {
   console.log(`Ingest server running on http://localhost:${port}`);
