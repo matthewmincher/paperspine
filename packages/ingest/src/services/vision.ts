@@ -13,7 +13,7 @@ export async function extractBooksFromImage(
   const base64 = imageBuffer.toString("base64");
   const mediaType = mimeType as "image/jpeg" | "image/png" | "image/gif" | "image/webp";
 
-  const result = await promptJson<ExtractedBook[]>("claude-sonnet-4-20250514", [
+  const result = await promptJson<ExtractedBook[]>("claude-sonnet-4-6", [
     {
       role: "user",
       content: [

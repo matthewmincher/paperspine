@@ -26,7 +26,7 @@ export async function uploadToAws(payload: UploadPayload) {
 
   let shelfImageUrl: string | undefined;
   if (payload.shelfPhoto) {
-    const key = `shelves/${shelfId}/photo.jpg`;
+    const key = `images/shelves/${shelfId}/photo.jpg`;
     await s3.send(
       new PutObjectCommand({
         Bucket: IMAGES_BUCKET,
@@ -35,7 +35,7 @@ export async function uploadToAws(payload: UploadPayload) {
         ContentType: payload.shelfPhotoMimeType ?? "image/jpeg",
       }),
     );
-    shelfImageUrl = `s3://${IMAGES_BUCKET}/${key}`;
+    shelfImageUrl = `/${key}`;
   }
 
   await ddb.send(
@@ -60,7 +60,7 @@ export async function uploadToAws(payload: UploadPayload) {
           const res = await fetch(coverUrl);
           if (res.ok) {
             const buffer = Buffer.from(await res.arrayBuffer());
-            const key = `covers/${bookId}.jpg`;
+            const key = `images/covers/${bookId}.jpg`;
             await s3.send(
               new PutObjectCommand({
                 Bucket: IMAGES_BUCKET,
@@ -69,7 +69,7 @@ export async function uploadToAws(payload: UploadPayload) {
                 ContentType: "image/jpeg",
               }),
             );
-            coverUrl = `s3://${IMAGES_BUCKET}/${key}`;
+            coverUrl = `/${key}`;
           }
         } catch {
           // Keep the original URL if download fails
