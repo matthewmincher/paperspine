@@ -49,6 +49,8 @@ jobs:
       - run: npm ci
 
       - run: npm run build -w @paperspine/frontend
+        env:
+          VITE_API_URL: ${{ vars.API_DOMAIN && format('https://{0}', vars.API_DOMAIN) || '' }}
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
