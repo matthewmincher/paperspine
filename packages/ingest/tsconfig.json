@@ -4,11 +4,10 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "outDir": "./dist",
-    "rootDir": "./src",
     "noEmit": true,
     "composite": false
   },
-  "include": ["src"],
+  "include": ["src", "test"],
   "references": [
     { "path": "../shared" }
   ]
