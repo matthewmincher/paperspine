@@ -4,3 +4,4 @@ dist/
 *.d.ts.map
 cdk.out/
 .vite/
+.env.local
