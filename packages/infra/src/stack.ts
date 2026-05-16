@@ -26,6 +26,10 @@ function deriveZoneName(domain: string): string {
   return parts.length <= 2 ? domain : parts.slice(1).join(".");
 }
 
+export interface PaperspineStackProps extends StackProps {
+  frontendCert?: acm.ICertificate;
+}
+
 export class PaperspineStack extends Stack {
   public readonly booksTable: dynamodb.Table;
   public readonly shelvesTable: dynamodb.Table;
@@ -34,11 +38,13 @@ export class PaperspineStack extends Stack {
   public readonly distribution: cloudfront.Distribution;
   public readonly api: apigateway.RestApi;
 
-  constructor(scope: Construct, id: string, props?: StackProps) {
+  constructor(scope: Construct, id: string, props?: PaperspineStackProps) {
     super(scope, id, props);
 
     const apiDomain = this.node.tryGetContext("apiDomain") as string | undefined;
     const frontendDomain = this.node.tryGetContext("frontendDomain") as string | undefined;
+
+    // --- Data stores ---
 
     this.booksTable = new dynamodb.Table(this, "BooksTable", {
       partitionKey: { name: "bookId", type: dynamodb.AttributeType.STRING },
@@ -70,20 +76,6 @@ export class PaperspineStack extends Stack {
 
     // --- CloudFront distribution ---
 
-    let frontendCert: acm.ICertificate | undefined;
-    if (frontendDomain) {
-      const zoneName = deriveZoneName(frontendDomain);
-      const zone = route53.HostedZone.fromLookup(this, "FrontendZone", {
-        domainName: zoneName,
-      });
-
-      frontendCert = new acm.DnsValidatedCertificate(this, "FrontendCert", {
-        domainName: frontendDomain,
-        hostedZone: zone,
-        region: "us-east-1",
-      });
-    }
-
     this.distribution = new cloudfront.Distribution(this, "Distribution", {
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(this.frontendBucket),
@@ -102,25 +94,10 @@ export class PaperspineStack extends Stack {
           responsePagePath: "/index.html",
         },
       ],
-      ...(frontendDomain && frontendCert
-        ? { domainNames: [frontendDomain], certificate: frontendCert }
+      ...(frontendDomain && props?.frontendCert
+        ? { domainNames: [frontendDomain], certificate: props.frontendCert }
         : {}),
     });
-
-    if (frontendDomain) {
-      const zoneName = deriveZoneName(frontendDomain);
-      const zone = route53.HostedZone.fromLookup(this, "FrontendAliasZone", {
-        domainName: zoneName,
-      });
-
-      new route53.ARecord(this, "FrontendAliasRecord", {
-        zone,
-        recordName: frontendDomain,
-        target: route53.RecordTarget.fromAlias(
-          new route53Targets.CloudFrontTarget(this.distribution),
-        ),
-      });
-    }
 
     // --- Lambda handlers ---
 
@@ -234,15 +211,13 @@ export class PaperspineStack extends Stack {
         : `https://${this.distribution.distributionDomainName}`,
     });
 
-    if (!apiDomain) {
-      new CfnOutput(this, "ApiDnsSetup", {
-        value: `To use a custom API domain, create a CNAME in your DNS provider pointing to: ${this.api.url}`,
-      });
-    }
+    new CfnOutput(this, "DistributionDomainName", {
+      value: this.distribution.distributionDomainName,
+    });
 
-    if (!frontendDomain) {
+    if (frontendDomain) {
       new CfnOutput(this, "FrontendDnsSetup", {
-        value: `To use a custom frontend domain, create a CNAME in your DNS provider pointing to: ${this.distribution.distributionDomainName}`,
+        value: `Create a CNAME from ${frontendDomain} to ${this.distribution.distributionDomainName} in your DNS provider.`,
       });
     }
 

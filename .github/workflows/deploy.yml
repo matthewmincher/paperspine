@@ -64,4 +64,4 @@ jobs:
           if [ -n "${{ vars.FRONTEND_DOMAIN }}" ]; then
             CONTEXT_ARGS="$CONTEXT_ARGS -c frontendDomain=${{ vars.FRONTEND_DOMAIN }}"
           fi
-          cd packages/infra && npx cdk deploy --require-approval never $CONTEXT_ARGS
+          cd packages/infra && npx cdk deploy --all --require-approval never $CONTEXT_ARGS
