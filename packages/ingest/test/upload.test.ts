@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const mockSend = vi.fn().mockResolvedValue({});
+const mockSend = vi.fn().mockResolvedValue({ Items: [] });
 
 vi.mock("@aws-sdk/client-dynamodb", () => ({
   DynamoDBClient: class { },
@@ -9,6 +9,7 @@ vi.mock("@aws-sdk/client-dynamodb", () => ({
 vi.mock("@aws-sdk/lib-dynamodb", () => ({
   DynamoDBDocumentClient: { from: () => ({ send: mockSend }) },
   PutCommand: class { constructor(public input: any) {} },
+  ScanCommand: class { constructor(public input: any) {} },
 }));
 
 vi.mock("@aws-sdk/client-s3", () => ({

@@ -102,24 +102,40 @@ export async function uploadToAws(payload: UploadPayload) {
       const bookId = randomUUID();
 
       let coverUrl = book.coverUrl;
-      if (coverUrl && coverUrl.startsWith("http")) {
+      if (coverUrl && (coverUrl.startsWith("http") || coverUrl.startsWith("data:"))) {
         try {
-          const res = await fetch(coverUrl);
-          if (res.ok) {
-            const buffer = Buffer.from(await res.arrayBuffer());
-            const key = `images/covers/${bookId}.jpg`;
+          let buffer: Buffer;
+          let contentType = "image/jpeg";
+
+          if (coverUrl.startsWith("data:")) {
+            const match = coverUrl.match(/^data:([^;]+);base64,(.+)$/);
+            if (match) {
+              contentType = match[1];
+              buffer = Buffer.from(match[2], "base64");
+            } else {
+              buffer = Buffer.alloc(0);
+            }
+          } else {
+            const res = await fetch(coverUrl);
+            if (!res.ok) throw new Error("fetch failed");
+            buffer = Buffer.from(await res.arrayBuffer());
+          }
+
+          if (buffer.length > 0) {
+            const ext = contentType.includes("png") ? "png" : "jpg";
+            const key = `images/covers/${bookId}.${ext}`;
             await s3.send(
               new PutObjectCommand({
                 Bucket: IMAGES_BUCKET,
                 Key: key,
                 Body: buffer,
-                ContentType: "image/jpeg",
+                ContentType: contentType,
               }),
             );
             coverUrl = `/${key}`;
           }
         } catch {
-          // Keep the original URL if download fails
+          // Keep the original URL if upload fails
         }
       }
 
