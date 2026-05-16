@@ -20,6 +20,30 @@ export interface UploadPayload {
   books: EnrichedBook[];
 }
 
+async function findExistingBooks(): Promise<Set<string>> {
+  const keys = new Set<string>();
+  let lastKey: Record<string, unknown> | undefined;
+
+  do {
+    const result = await ddb.send(
+      new ScanCommand({
+        TableName: BOOKS_TABLE,
+        ProjectionExpression: "title, author, isbn",
+        ExclusiveStartKey: lastKey,
+      }),
+    );
+    for (const item of result.Items ?? []) {
+      if (item.isbn) {
+        keys.add(`isbn::${item.isbn as string}`);
+      }
+      keys.add(`title::${(item.title as string).toLowerCase()}::${(item.author as string).toLowerCase()}`);
+    }
+    lastKey = result.LastEvaluatedKey;
+  } while (lastKey);
+
+  return keys;
+}
+
 async function findShelfByName(name: string): Promise<string | undefined> {
   const result = await ddb.send(
     new ScanCommand({
@@ -67,8 +91,14 @@ export async function uploadToAws(payload: UploadPayload) {
     );
   }
 
+  const existingBooks = await findExistingBooks();
+
   const bookResults = await Promise.all(
     payload.books.map(async (book) => {
+      const isbnMatch = book.isbn && existingBooks.has(`isbn::${book.isbn}`);
+      const titleMatch = existingBooks.has(`title::${book.title.toLowerCase()}::${book.author.toLowerCase()}`);
+      if (isbnMatch || titleMatch) return null;
+
       const bookId = randomUUID();
 
       let coverUrl = book.coverUrl;
@@ -114,5 +144,7 @@ export async function uploadToAws(payload: UploadPayload) {
     }),
   );
 
-  return { shelfId, bookIds: bookResults };
+  const newBookIds = bookResults.filter((id) => id !== null);
+  const skipped = bookResults.length - newBookIds.length;
+  return { shelfId, bookIds: newBookIds, skipped };
 }
