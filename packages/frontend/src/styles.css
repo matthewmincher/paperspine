@@ -4,6 +4,7 @@ body {
   font-family: system-ui, -apple-system, sans-serif;
   color: #1a1a1a;
   background: #fafafa;
+  overflow-y: scroll;
 }
 
 .app {
