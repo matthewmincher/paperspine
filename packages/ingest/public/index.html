@@ -114,17 +114,30 @@
     dropZone.addEventListener('drop', (e) => {
       e.preventDefault();
       dropZone.classList.remove('dragover');
-      for (const file of e.dataTransfer.files) handleFile(file);
+      handleFiles([...e.dataTransfer.files]);
     });
     fileInput.addEventListener('change', () => {
-      for (const file of fileInput.files) handleFile(file);
+      handleFiles([...fileInput.files]);
       fileInput.value = '';
     });
 
-    async function handleFile(file) {
-      if (!file.type.startsWith('image/')) { showError('Please select an image file.'); return; }
-      showLoading('Analyzing bookshelf photo — extracting and enriching books...');
+    async function handleFiles(files) {
+      const images = files.filter(f => f.type.startsWith('image/'));
+      if (!images.length) { showError('Please select image file(s).'); return; }
 
+      for (let i = 0; i < images.length; i++) {
+        showLoading(`Analyzing photo ${i + 1} of ${images.length}...`);
+        await processFile(images[i]);
+      }
+
+      if (books.length) {
+        hideStatus();
+        renderBooks();
+        reviewSection.classList.add('visible');
+      }
+    }
+
+    async function processFile(file) {
       const formData = new FormData();
       formData.append('photo', file);
 
@@ -133,7 +146,7 @@
         if (!res.ok) throw new Error((await res.json()).error || 'Upload failed');
         const data = await res.json();
 
-        if (!data.books.length) { showError('No books detected in this image.'); return; }
+        if (!data.books.length) return;
 
         if (!shelfPhoto) {
           shelfPhoto = data.shelfPhoto;
@@ -143,10 +156,6 @@
         const existing = new Set(books.map(b => `${b.title.toLowerCase()}::${b.author.toLowerCase()}`));
         const newBooks = data.books.filter(b => !existing.has(`${b.title.toLowerCase()}::${b.author.toLowerCase()}`));
         books.push(...newBooks);
-
-        hideStatus();
-        renderBooks();
-        reviewSection.classList.add('visible');
       } catch (err) {
         showError(err.message);
       }
