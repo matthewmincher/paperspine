@@ -1,0 +1,20 @@
+{
+  "name": "@paperspine/infra",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@paperspine/shared": "*",
+    "aws-cdk-lib": "^2.170.0",
+    "constructs": "^10.0.0"
+  },
+  "devDependencies": {
+    "aws-cdk": "^2.170.0"
+  }
+}
