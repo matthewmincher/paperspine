@@ -16,10 +16,24 @@ export interface EnrichedBook {
 export async function enrichBooks(
   extracted: ExtractedBook[],
 ): Promise<EnrichedBook[]> {
-  return Promise.all(extracted.map(enrichSingle));
+  const results: EnrichedBook[] = [];
+  const genreTags = new Set<string>();
+
+  for (const book of extracted) {
+    const enriched = await enrichSingle(book, [...genreTags]);
+    for (const tag of enriched.tags) {
+      if (tag.category === "genre") genreTags.add(tag.name);
+    }
+    results.push(enriched);
+  }
+
+  return results;
 }
 
-async function enrichSingle(book: ExtractedBook): Promise<EnrichedBook> {
+async function enrichSingle(
+  book: ExtractedBook,
+  existingTags: string[],
+): Promise<EnrichedBook> {
   const olResult = await lookupBook(book.title, book.author).catch(
     () => ({ isbn: undefined, coverUrl: undefined, description: undefined, subjects: undefined }),
   );
@@ -29,6 +43,7 @@ async function enrichSingle(book: ExtractedBook): Promise<EnrichedBook> {
     book.author,
     olResult.description,
     olResult.subjects,
+    existingTags,
   ).catch(() => []);
 
   return {
