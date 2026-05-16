@@ -30,7 +30,18 @@ export function App() {
   const tagsApi = useApi(() => getTags(), []);
   const shelvesApi = useApi(() => getShelves(), []);
 
-  const books = booksApi.data?.books ?? [];
+  const books = useMemo(() => {
+    const surname = (author: string) => {
+      const first = author.split(/[,&]/).map((s) => s.trim())[0];
+      const parts = first.split(/\s+/);
+      return parts[parts.length - 1].toLowerCase();
+    };
+    return [...(booksApi.data?.books ?? [])].sort(
+      (a, b) =>
+        surname(a.author).localeCompare(surname(b.author)) ||
+        a.title.localeCompare(b.title),
+    );
+  }, [booksApi.data]);
   const tags = tagsApi.data?.tags ?? [];
   const shelves = shelvesApi.data?.shelves ?? [];
 
