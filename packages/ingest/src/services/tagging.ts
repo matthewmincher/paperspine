@@ -1,7 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
 import type { Tag } from "@paperspine/shared";
-
-const anthropic = new Anthropic();
+import { promptJson } from "./llm.js";
 
 export async function generateTags(
   title: string,
@@ -18,10 +16,9 @@ export async function generateTags(
     .filter(Boolean)
     .join("\n");
 
-  const response = await anthropic.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 1024,
-    messages: [
+  const result = await promptJson<Tag[]>(
+    "claude-haiku-4-5-20251001",
+    [
       {
         role: "user",
         content: `Given this book metadata, generate 3-6 normalised tags. Each tag should have a "name" (lowercase, 1-3 words) and a "category" (one of: genre, theme, mood, other).
@@ -32,16 +29,8 @@ Return ONLY valid JSON array, no other text:
 [{"name": "...", "category": "genre|theme|mood|other"}]`,
       },
     ],
-  });
+    1024,
+  );
 
-  const text = response.content[0];
-  if (text.type !== "text") return [];
-
-  try {
-    return JSON.parse(text.text);
-  } catch {
-    const match = text.text.match(/\[[\s\S]*\]/);
-    if (match) return JSON.parse(match[0]);
-    return [];
-  }
+  return result ?? [];
 }
