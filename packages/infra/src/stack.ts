@@ -81,6 +81,13 @@ export class PaperspineStack extends Stack {
         origin: origins.S3BucketOrigin.withOriginAccessControl(this.frontendBucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
       },
+      additionalBehaviors: {
+        "/images/*": {
+          origin: origins.S3BucketOrigin.withOriginAccessControl(this.imagesBucket),
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        },
+      },
       defaultRootObject: "index.html",
       errorResponses: [
         {
