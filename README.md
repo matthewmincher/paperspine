@@ -22,7 +22,7 @@ packages/
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 24+
 - An AWS account with credentials configured (`aws configure`)
 - An [Anthropic API key](https://console.anthropic.com/) for the ingest tool
 
