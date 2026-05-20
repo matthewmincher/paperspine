@@ -41,7 +41,7 @@ describe("PaperspineStack", () => {
 
   it("creates Lambda functions for API endpoints", () => {
     template.hasResourceProperties("AWS::Lambda::Function", {
-      Runtime: "nodejs20.x",
+      Runtime: "nodejs24.x",
     });
   });
 
